@@ -2,8 +2,10 @@ import pandas as pd
 import streamlit as st
 from sqlalchemy import text
 
-from database.db import engine
+from database.db import Base, engine
+from database import models
 
+Base.metadata.create_all(bind=engine)
 
 st.set_page_config(
     page_title="Garment Store Management",
