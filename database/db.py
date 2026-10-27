@@ -1,12 +1,28 @@
+
 import os
 
+import streamlit as st
 from dotenv import load_dotenv
-from sqlalchemy import create_engine, text
+from sqlalchemy import create_engine
 from sqlalchemy.engine import URL
 from sqlalchemy.orm import DeclarativeBase, sessionmaker
 
-# Load environment variables from .env
+# Load local .env settings (for local development)
 load_dotenv()
+
+
+def get_setting(name):
+    """Read a setting from Streamlit Cloud secrets or local environment."""
+    try:
+        value = st.secrets.get(name)
+        if value:
+            return str(value)
+    except Exception:
+        # Streamlit secrets may not exist during local development.
+        pass
+
+    return os.getenv(name)
+
 
 # Required database configuration
 required_settings = [
@@ -17,10 +33,10 @@ required_settings = [
     "DB_PASSWORD",
 ]
 
+settings = {name: get_setting(name) for name in required_settings}
+
 missing_settings = [
-    setting
-    for setting in required_settings
-    if not os.getenv(setting)
+    name for name, value in settings.items() if not value
 ]
 
 if missing_settings:
@@ -31,11 +47,11 @@ if missing_settings:
 # Build the PostgreSQL connection URL
 database_url = URL.create(
     drivername="postgresql+psycopg2",
-    username=os.getenv("DB_USER"),
-    password=os.getenv("DB_PASSWORD"),
-    host=os.getenv("DB_HOST"),
-    port=int(os.getenv("DB_PORT")),
-    database=os.getenv("DB_NAME"),
+    username=settings["DB_USER"],
+    password=settings["DB_PASSWORD"],
+    host=settings["DB_HOST"],
+    port=int(settings["DB_PORT"]),
+    database=settings["DB_NAME"],
 )
 
 # Create the SQLAlchemy engine
@@ -46,7 +62,6 @@ engine = create_engine(
     max_overflow=10,
 )
 
-# Create a reusable session factory
 SessionLocal = sessionmaker(
     bind=engine,
     autoflush=False,
@@ -54,18 +69,14 @@ SessionLocal = sessionmaker(
 )
 
 
-# Base class for database models
 class Base(DeclarativeBase):
     pass
 
 
-# Database session generator
 def get_db_session():
     session = SessionLocal()
-
     try:
         yield session
     finally:
         session.close()
-
 
