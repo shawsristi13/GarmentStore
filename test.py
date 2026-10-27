@@ -1,9 +1,23 @@
 from database.db import engine
-from sqlalchemy import inspect
+from sqlalchemy import text
 
-inspector = inspect(engine)
+query = text("""
+    SELECT
+        p.id,
+        p.name,
+        p.is_active AS product_active,
+        pv.sku,
+        pv.is_active AS variant_active
+    FROM public.products p
+    JOIN public.product_variants pv
+        ON pv.product_id = p.id
+    ORDER BY p.id
+""")
 
-for table in ["products", "product_variants", "suppliers", "purchases", "purchase_items", "sales", "sale_items", "expenses"]:
-    print(f"\n--- {table} ---")
-    for column in inspector.get_columns(table, schema="public"):
-        print(f"{column['name']} ({column['type']})")
+with engine.connect() as connection:
+    rows = connection.execute(query).mappings().all()
+
+    for row in rows:
+        print(dict(row))
+
+    print(f"\nTotal active products/variants: {sum(1 for r in rows if r['product_active'] and r['variant_active'])}")
